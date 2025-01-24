@@ -1,0 +1,47 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE = "portfolio-site"
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git 'https://github.com/Bharat-Singhh/Portfolio.git'
+            }
+        }
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    sh 'docker build -t $DOCKER_IMAGE .'
+                }
+            }
+        }
+        stage('Test Docker Image') {
+            steps {
+                script {
+                    sh '''
+                    docker run -d -p 8080:80 $DOCKER_IMAGE
+                    sleep 5
+                    curl -f http://localhost:8080 || exit 1
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                sh 'docker stop $(docker ps -q --filter ancestor=$DOCKER_IMAGE)'
+            }
+        }
+        success {
+            echo 'Build and test succeeded!'
+        }
+        failure {
+            echo 'Build or test failed!'
+        }
+    }
+}
