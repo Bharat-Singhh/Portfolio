@@ -3,28 +3,111 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = "portfolio-site"
+        K8S_NAMESPACE = "portfolio-app"
+        REPO_URL = "https://github.com/Bharat-Singhh/Portfolio.git"
     }
 
     stages {
         stage('Clone Repository') {
             steps {
-                git 'https://github.com/Bharat-Singhh/Portfolio.git'
+                echo "Cloning repository..."
+                git branch: 'main', url: "${REPO_URL}"
             }
         }
+
         stage('Build Docker Image') {
             steps {
+                echo "Building Docker image..."
                 script {
                     sh 'docker build -t $DOCKER_IMAGE .'
                 }
             }
         }
-        stage('Test Docker Image') {
+
+        stage('Run Tests') {
             steps {
+                echo "Running container and testing..."
                 script {
                     sh '''
-                    docker run -d -p 8080:80 $DOCKER_IMAGE
+                    docker run -d --name portfolio-container -p 8080:80 $DOCKER_IMAGE
                     sleep 5
                     curl -f http://localhost:8080 || exit 1
+                    '''
+                }
+            }
+            post {
+                always {
+                    echo "Cleaning up test container..."
+                    sh 'docker rm -f portfolio-container || true'
+                }
+            }
+        }
+
+        stage('Push Docker Image to Registry') {
+            steps {
+                echo "Tagging and pushing image to Docker Hub..."
+                script {
+                    sh '''
+                    docker tag $DOCKER_IMAGE bharat-singhh/$DOCKER_IMAGE:latest
+                    docker login -u $DOCKER_USER -p $DOCKER_PASS
+                    docker push bharat-singhh/$DOCKER_IMAGE:latest
+                    '''
+                }
+            }
+        }
+
+        stage('Generate Kubernetes Manifests') {
+            steps {
+                echo "Creating Kubernetes YAML files..."
+                script {
+                    writeFile file: 'deployment.yaml', text: """
+                    apiVersion: apps/v1
+                    kind: Deployment
+                    metadata:
+                      name: portfolio-deployment
+                      namespace: $K8S_NAMESPACE
+                    spec:
+                      replicas: 3
+                      selector:
+                        matchLabels:
+                          app: portfolio
+                      template:
+                        metadata:
+                          labels:
+                            app: portfolio
+                        spec:
+                          containers:
+                          - name: portfolio-container
+                            image: bharat-singhh/$DOCKER_IMAGE:latest
+                            ports:
+                            - containerPort: 80
+                    """
+                    writeFile file: 'service.yaml', text: """
+                    apiVersion: v1
+                    kind: Service
+                    metadata:
+                      name: portfolio-service
+                      namespace: $K8S_NAMESPACE
+                    spec:
+                      selector:
+                        app: portfolio
+                      ports:
+                      - protocol: TCP
+                        port: 80
+                        targetPort: 80
+                      type: LoadBalancer
+                    """
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                echo "Applying Kubernetes manifests..."
+                script {
+                    sh '''
+                    kubectl apply -f deployment.yaml
+                    kubectl apply -f service.yaml
                     '''
                 }
             }
@@ -32,16 +115,11 @@ pipeline {
     }
 
     post {
-        always {
-            script {
-                sh 'docker stop $(docker ps -q --filter ancestor=$DOCKER_IMAGE)'
-            }
-        }
         success {
-            echo 'Build and test succeeded!'
+            echo "Pipeline executed successfully!"
         }
         failure {
-            echo 'Build or test failed!'
+            echo "Pipeline execution failed. Check logs for details."
         }
     }
 }
