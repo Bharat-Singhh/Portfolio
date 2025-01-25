@@ -2,74 +2,120 @@ pipeline {
     agent { 
         node {
             label 'docker-agent-python'
-            }
-
+            customWorkspace "/var/jenkins/workspace/${JOB_NAME}"  
+        }
+    }
+    
     environment {
+        DOCKER_REGISTRY = "bharat-singhh"
         DOCKER_IMAGE = "portfolio-site"
         K8S_NAMESPACE = "portfolio-app"
         REPO_URL = "https://github.com/Bharat-Singhh/Portfolio.git"
+        BUILD_VERSION = "${env.BUILD_ID}-${GIT_COMMIT.take(8)}"  
+        KUBECONFIG = credentials('kubeconfig')
+    }
+
+    parameters {
+        string(name: 'DEPLOY_ENV', defaultValue: 'staging', description: 'Deployment environment')
+        booleanParam(name: 'RUN_TESTS', defaultValue: true, description: 'Execute test stage')
     }
 
     stages {
         stage('Clone Repository') {
             steps {
-                echo "Cloning repository..."
-                git branch: 'main', url: "${REPO_URL}"
+                echo "📦 Cloning ${REPO_URL}"
+                git branch: 'main', url: "${REPO_URL}", credentialsId: 'github-ssh'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                echo "Building Docker image..."
+                echo "🐳 Building Docker Image (v${BUILD_VERSION})"
                 script {
-                    sh 'docker build -t $DOCKER_IMAGE .'
+                    sh """
+                    docker build -t ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${BUILD_VERSION} \\
+                                 -t ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:latest .
+                    """
                 }
             }
         }
 
-        stage('Run Tests') {
+        stage('Quality Checks') {
+            when { expression { params.RUN_TESTS } }
             steps {
-                echo "Running container and testing..."
+                echo "🔍 Running Security Scan"
                 script {
-                    sh '''
-                    docker run -d --name portfolio-container -p 8080:80 $DOCKER_IMAGE
-                    sleep 5
-                    curl -f http://localhost:8080 || exit 1
-                    '''
-                }
-            }
-            post {
-                always {
-                    echo "Cleaning up test container..."
-                    sh 'docker rm -f portfolio-container || true'
+                    sh "docker scan ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${BUILD_VERSION}"
                 }
             }
         }
 
-        stage('Push Docker Image to Registry') {
+        stage('Test Deployment') {
+            when { expression { params.RUN_TESTS } }
             steps {
-                echo "Tagging and pushing image to Docker Hub..."
+                echo "🧪 Testing Application"
                 script {
-                    sh '''
-                    docker tag $DOCKER_IMAGE bharat-singhh/$DOCKER_IMAGE:latest
-                    docker login -u $DOCKER_USER -p $DOCKER_PASS
-                    docker push bharat-singhh/$DOCKER_IMAGE:latest
-                    '''
+                    try {
+                        sh """
+                        docker run --rm -d --name portfolio-test \\
+                            -p 8080:80 \\
+                            ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${BUILD_VERSION}
+                        sleep 10
+                        curl -sSf http://localhost:8080/healthcheck
+                        """
+                    } finally {
+                        sh 'docker rm -f portfolio-test || true'
+                    }
                 }
             }
         }
 
-        stage('Generate Kubernetes Manifests') {
+        stage('Push to Registry') {
             steps {
-                echo "Creating Kubernetes YAML files..."
+                echo "🚀 Publishing Artifact"
                 script {
-                    writeFile file: 'deployment.yaml', text: """
+                    withCredentials([usernamePassword(
+                        credentialsId: 'docker-hub-creds',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )]) {
+                        sh """
+                        docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
+                        docker push ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${BUILD_VERSION}
+                        docker push ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:latest
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Generate Manifests') {
+            steps {
+                echo "📄 Generating Kubernetes Resources"
+                script {
+                    writeFile file: 'k8s/namespace.yaml', text: """
+                    apiVersion: v1
+                    kind: Namespace
+                    metadata:
+                      name: ${K8S_NAMESPACE}
+                      labels:
+                        env: ${params.DEPLOY_ENV}
+                    """
+                    
+                    writeFile file: 'k8s/deployment.yaml', text: """
                     apiVersion: apps/v1
                     kind: Deployment
                     metadata:
                       name: portfolio-deployment
-                      namespace: $K8S_NAMESPACE
+                      namespace: ${K8S_NAMESPACE}
+                      annotations:
+                        jenkins/build: "${BUILD_VERSION}"
                     spec:
+                      strategy:
+                        rollingUpdate:
+                          maxSurge: 25%
+                          maxUnavailable: 25%
+                        type: RollingUpdate
                       replicas: 3
                       selector:
                         matchLabels:
@@ -78,27 +124,26 @@ pipeline {
                         metadata:
                           labels:
                             app: portfolio
+                            env: ${params.DEPLOY_ENV}
                         spec:
                           containers:
-                          - name: portfolio-container
-                            image: bharat-singhh/$DOCKER_IMAGE:latest
+                          - name: portfolio
+                            image: ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${BUILD_VERSION}
                             ports:
                             - containerPort: 80
-                    """
-                    writeFile file: 'service.yaml', text: """
-                    apiVersion: v1
-                    kind: Service
-                    metadata:
-                      name: portfolio-service
-                      namespace: $K8S_NAMESPACE
-                    spec:
-                      selector:
-                        app: portfolio
-                      ports:
-                      - protocol: TCP
-                        port: 80
-                        targetPort: 80
-                      type: LoadBalancer
+                            resources:
+                              requests:
+                                memory: "64Mi"
+                                cpu: "50m"
+                              limits:
+                                memory: "128Mi"
+                                cpu: "100m"
+                            livenessProbe:
+                              httpGet:
+                                path: /healthcheck
+                                port: 80
+                              initialDelaySeconds: 5
+                              periodSeconds: 10
                     """
                 }
             }
@@ -106,12 +151,15 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             steps {
-                echo "Applying Kubernetes manifests..."
+                echo "🚢 Deploying to ${params.DEPLOY_ENV}"
                 script {
-                    sh '''
-                    kubectl apply -f deployment.yaml
-                    kubectl apply -f service.yaml
-                    '''
+                    dir('k8s') {
+                        sh """
+                        kubectl apply -f namespace.yaml --validate=true
+                        kubectl apply -f deployment.yaml --validate=true
+                        kubectl rollout status deployment/portfolio-deployment -n ${K8S_NAMESPACE} --timeout=120s
+                        """
+                    }
                 }
             }
         }
@@ -119,10 +167,20 @@ pipeline {
 
     post {
         success {
-            echo "Pipeline executed successfully!"
+            echo "🎉 Success! Deployment complete in ${currentBuild.durationString}"
+            slackSend color: 'good', message: "✅ ${JOB_NAME} v${BUILD_VERSION} deployed to ${params.DEPLOY_ENV}"
         }
         failure {
-            echo "Pipeline execution failed. Check logs for details."
+            echo "❌ Pipeline failed after ${currentBuild.durationString}"
+            slackSend color: 'danger', message: "⚠️ ${JOB_NAME} failed in stage: ${currentBuild.result}"
+            script {
+                sh "kubectl rollout undo deployment/portfolio-deployment -n ${K8S_NAMESPACE}"
+            }
+        }
+        cleanup {
+            echo "🧹 Cleaning workspace"
+            sh "docker system prune -f"
+            deleteDir()
         }
     }
 }
