@@ -2,9 +2,10 @@ pipeline {
     agent any
     stages {
         stage('Clone Repository') {
-            steps {
-                git 'https://github.com/Bharat-Singhh/Portfolio.git'
-            }
+             steps {
+                git branch: 'main', 
+                url: 'https://github.com/Bharat-Singhh/Portfolio.git'
+             }
         }
         stage('Build Docker Image') {
             steps {
