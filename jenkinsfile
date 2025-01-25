@@ -1,111 +1,92 @@
 pipeline {
-    agent any
-    environment {
-        // Name of the Docker image
-        DOCKER_IMAGE = "my-web-app"
-
-        // Build version: combination of branch name and build number
-        BUILD_VERSION = "${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
-
-        // DockerHub (or private registry) credentials ID in Jenkins
-        REGISTRY_CREDENTIALS = 'dockerhub-creds' // CHANGE THIS to your Jenkins credentials ID for DockerHub
-
-        // Your Docker registry username
-        DOCKER_REGISTRY = 'india007' // CHANGE THIS to your DockerHub username
-    }
-
-    stages {
-        stage('Validate Pipeline Environment') {
-            steps {
-                // Validate required tools
-                sh 'docker --version'
-                sh 'curl --version'
-            }
+    agent { 
+        node {
+            label 'docker-agent-007' // Ensure this label matches the correct Jenkins agent
         }
-
+    }
+    
+    triggers {
+        pollSCM('* * * * *') // Adjust polling frequency based on your needs
+    }
+    
+    stages {
         stage('Clone Repository') {
             steps {
-                git branch: 'main',  // CHANGE THIS if your branch is not 'main'
-                    url: 'https://github.com/Bharat-Singhh/Portfolio.git', // CHANGE THIS to your repository URL
-            }
-        }
-
-        stage('Code Linting') {
-            steps {
-                // Install and run linting tool for HTML files
-                sh """
-                npm install -g htmlhint
-                htmlhint app/*.html
-                """
+                echo "Cloning the repository..."
+                git branch: 'main', 
+                    url: 'https://github.com/india0/portfolio-site.git' // Replace with your repository URL
             }
         }
 
         stage('Build Docker Image') {
             steps {
+                echo "Building Docker image..."
                 script {
-                    // Build and tag Docker image
-                    sh """
-                    docker build -t ${DOCKER_IMAGE}:${BUILD_VERSION} .
-                    docker tag ${DOCKER_IMAGE}:${BUILD_VERSION} ${DOCKER_IMAGE}:latest
-                    """
+                    sh '''
+                    docker build -t india0/portfolio-site:latest .
+                    '''
                 }
             }
         }
-
-        stage('Test Docker Image') {
+        
+        stage('Run Docker Container') {
             steps {
+                echo "Running the Docker container..."
+                sh '''
+                docker run -d --name my-portfolio-app \
+                    -p 8080:80 \
+                    india0/portfolio-site:latest
+                '''
+            }
+        }
+        
+        stage('Test Application') {
+            steps {
+                echo "Testing the application..."
                 script {
                     try {
-                        // Run the Docker container for testing
-                        sh """
-                        docker run -d -p 8080:80 \
-                            --name test-container \
-                            ${DOCKER_IMAGE}:${BUILD_VERSION}
-                        """
-                        
-                        // Wait for the container to start and perform a test request
+                        // Perform tests such as checking the app's response
+                        sh '''
                         sleep 5
-                        sh "curl --retry 3 --retry-delay 5 -f http://localhost:8080"
+                        curl -f http://localhost:8080
+                        '''
+                        echo "✅ Application is running successfully!"
+                    } catch (Exception e) {
+                        error "❌ Application test failed! Check the logs for more details."
                     } finally {
-                        // Cleanup the test container
-                        sh 'docker stop test-container || true'
-                        sh 'docker rm test-container || true'
+                        // Ensure the container is stopped after testing
+                        sh '''
+                        docker stop my-portfolio-app || true
+                        docker rm my-portfolio-app || true
+                        '''
                     }
                 }
             }
         }
-
-        stage('Push Docker Image') {
+        
+        stage('Deliver') {
             steps {
-                script {
-                    withCredentials([usernamePassword(
-                        credentialsId: REGISTRY_CREDENTIALS,  // DockerHub credentials
-                        usernameVariable: 'DOCKER_USERNAME', 
-                        passwordVariable: 'DOCKER_PASSWORD'
-                    )]) {
-                        // Log in to DockerHub and push the image
-                        sh """
-                        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:${BUILD_VERSION}
-                        docker push ${DOCKER_REGISTRY}/${DOCKER_IMAGE}:latest
-                        """
-                    }
-                }
+                echo "Delivering the application..."
+                sh '''
+                echo "Deployment or other delivery steps can be added here."
+                '''
             }
         }
     }
-
+    
     post {
         always {
-            // Clean up old Docker artifacts and workspace
-            sh 'docker system prune -f --filter "until=24h"'
+            echo "Cleaning up Docker resources..."
+            sh '''
+            docker system prune -f --filter "until=24h"
+            '''
             cleanWs()
         }
         success {
-            echo "✅ Pipeline succeeded! Build Version: ${BUILD_VERSION}"
+            echo "✅ Pipeline completed successfully!"
         }
         failure {
-            echo "❌ Pipeline failed! Check logs for details."
+            echo "❌ Pipeline failed. Check the logs for details."
         }
     }
 }
