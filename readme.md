@@ -175,13 +175,18 @@ pipeline {
 ```
 
 This pipeline builds and tests the Docker image every time there is a new commit in the repository.
+'''
 
 
 ![dont forget to check logs]({FEE90B55-3CBA-421B-AB2F-047B0996CDCD}.png)
 
 
+'''
+
 
 ![started by SCM change(starts everytime after changes are made in repo)]({D58C0E8D-C88B-42AB-BEF6-9AB7B21DED61}.png)
+
+'''
 ## 4. Kubernetes Deployment
 
 The Dockerized application is deployed to a Kubernetes cluster using Kubernetes manifests. The following files were created:
@@ -283,7 +288,13 @@ spec:
 ```bash
 kubectl apply -f argo-cd-application.yaml
 ```
+'''
+
+
 ![alt text]({8C93171F-121C-4F01-BC3C-D6EDC2A38D96}.png)
+
+
+'''
 
 ## 6. Canary Release Strategy with Argo Rollouts
 
@@ -359,9 +370,12 @@ scrape_configs:
 
 - Install Grafana on your Kubernetes cluster. username and password is admin
 - Set up Grafana dashboards to visualize application metrics from Prometheus.
-
+'''
 
 ![add data source -> prometheus -> http://192.ks.x.x:9090]({D2EB06F7-383D-4B4A-9335-B65BD61F3103}.png)
+
+
+'''
 
 Logging:
 Centralized logging is set up using EFK Stack (Elasticsearch, Fluentd, Kibana). This helps in collecting, analyzing, and visualizing logs from the Kubernetes pods.
