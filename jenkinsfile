@@ -1,73 +1,42 @@
 pipeline {
-    agent { 
-        node {
-            label 'docker-agent-007' // Ensure this label matches the correct Jenkins agent
-        }
-    }
-    
+    agent any // Run on any available agent
+
     triggers {
-        pollSCM('* * * * *') // Adjust polling frequency based on your needs
+        pollSCM('* * * * *') // Adjust polling frequency as needed
     }
-    
+
     stages {
         stage('Clone Repository') {
             steps {
                 echo "Cloning the repository..."
-                git branch: 'main', 
-                    url: 'https://github.com/Bharat-Singhh/Portfolio.git' // Replace with your repository URL
+                git branch: 'main', url: 'https://github.com/Bharat-Singhh/Portfolio.git' // Replace with your repository URL
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build and Test') {
             steps {
                 echo "Building Docker image..."
                 script {
                     sh 'docker build -t india0/portfolio-site:latest .'
                 }
-            }
-        }
-        
-        stage('Run Docker Container') {
-            steps {
-                echo "Running the Docker container..."
-                sh 'docker run -d -p 80:80 india0/portfolio-site:latest'
-            }
-        }
-        
-        stage('Test Application') {
-            steps {
+
                 echo "Testing the application..."
                 script {
                     try {
-                        // Perform tests such as checking the app's response
+                        // Add your improved application tests here (e.g., using curl or other tools)
                         sh '''
                         sleep 5
-                        curl -f http://localhost:8080
-                        '''
-                        echo "✅ Application is running successfully!"
+                        curl -f http://localhost:80
+                        echo "✅ Application test successful!"
+                    '''
                     } catch (Exception e) {
-                        error "❌ Application test failed! Check the logs for more details."
-                    } finally {
-                        // Ensure the container is stopped after testing
-                        sh '''
-                        docker stop my-portfolio-app || true
-                        docker rm my-portfolio-app || true
-                        '''
+                        error "❌ Application test failed! Check the logs for details."
                     }
                 }
             }
         }
-        
-        stage('Deliver') {
-            steps {
-                echo "Delivering the application..."
-                sh '''
-                echo "Deployment or other delivery steps can be added here."
-                '''
-            }
-        }
     }
-    
+
     post {
         always {
             echo "Cleaning up Docker resources..."
