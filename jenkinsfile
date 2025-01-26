@@ -22,9 +22,7 @@ pipeline {
             steps {
                 echo "Building Docker image..."
                 script {
-                    sh '''
-                    docker build -t india0/portfolio-site:latest .
-                    '''
+                    sh 'docker build -t india0/portfolio-site:latest .'
                 }
             }
         }
@@ -32,11 +30,7 @@ pipeline {
         stage('Run Docker Container') {
             steps {
                 echo "Running the Docker container..."
-                sh '''
-                docker run -d --name my-portfolio-app \
-                    -p 8080:80 \
-                    india0/portfolio-site:latest
-                '''
+                sh 'docker run -d -p 80:80 india0/portfolio-site:latest'
             }
         }
         
