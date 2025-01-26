@@ -26,7 +26,7 @@ pipeline {
                         // Add your improved application tests here (e.g., using curl or other tools)
                         sh '''
                         sleep 15s
-                        curl -f http://localhost:7070
+                        curl -f http://localhost:8080
                         echo "✅ Application test successful!"
                         '''
                     } catch (Exception e) {
