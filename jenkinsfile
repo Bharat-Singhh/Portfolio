@@ -13,24 +13,44 @@ pipeline {
             }
         }
 
-        stage('Build and Test') {
+        stage('Build Docker Image') {
             steps {
                 echo "Building Docker image..."
                 script {
                     sh 'docker build -t india0/portfolio-site:latest .'
                 }
+            }
+        }
 
-                echo "Testing the application..."
+        stage('Run and Test Application') {
+            steps {
                 script {
+                    echo "Starting the application container..."
                     try {
-                        // Add your improved application tests here (e.g., using curl or other tools)
+                        // Run the container
                         sh '''
-                        sleep 15s
+                        docker run -d --name portfolio-test-container -p 8080:80 india0/portfolio-site:latest
+                        '''
+
+                        // Wait for the application to initialize
+                        echo "Waiting for the application to start..."
+                        sleep(15)
+
+                        // Test the application
+                        echo "Testing the application..."
+                        sh '''
                         curl -f http://localhost:8080
                         echo "✅ Application test successful!"
                         '''
                     } catch (Exception e) {
                         error "❌ Application test failed! Check the logs for details."
+                    } finally {
+                        // Stop and remove the container after testing
+                        echo "Stopping and cleaning up the test container..."
+                        sh '''
+                        docker stop portfolio-test-container || true
+                        docker rm portfolio-test-container || true
+                        '''
                     }
                 }
             }
