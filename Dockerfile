@@ -1,5 +1,10 @@
+# Use an nginx base image
 FROM nginx:alpine
 
-COPY . /usr/share/nginx/html/
+# Copy HTML/CSS to the default nginx path
+COPY index.html /usr/share/nginx/html/
+COPY assets /usr/share/nginx/html/
 
-EXPOSE 7070
+
+# Expose port 80
+EXPOSE 80
