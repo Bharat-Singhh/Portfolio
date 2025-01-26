@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: portfolio-rollout
+spec:
+  replicas: 5  # Total number of pods
+  strategy:
+    canary:
+      steps:
+        - setWeight: 10  # Release 10% of the traffic to the new version
+        - pause: {}  # Optional pause for manual approval before the next step
+        - setWeight: 30  # Release 30% of the traffic to the new version
+        - pause: {}
+        - setWeight: 50  # Release 50% of the traffic to the new version
+        - pause: {}
+        - setWeight: 100  # Finally, release all traffic to the new version
+  template:
+    metadata:
+      labels:
+        app: portfolio
+    spec:
+      containers:
+        - name: portfolio-container
+          image: india0/portfolio-site:latest  # Replace with your image name
+          ports:
+            - containerPort: 80
