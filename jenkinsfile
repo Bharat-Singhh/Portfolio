@@ -14,7 +14,7 @@ pipeline {
             steps {
                 echo "Cloning the repository..."
                 git branch: 'main', 
-                    url: 'https://github.com/india0/portfolio-site.git' // Replace with your repository URL
+                    url: 'https://github.com/Bharat-Singhh/Portfolio.git' // Replace with your repository URL
             }
         }
 
