@@ -81,11 +81,11 @@ Jenkins is used to set up the CI pipeline, ensuring automatic building and testi
 - i make custom Jenkins docker image for this  and don't forget to download all necessary plugins in jenkins
 manage jenkins-> plugins
 -i used this repo to make custom docker image for jenkins https://github.com/shazChaudhry/docker-jenkins/blob/ee0f386fd1706829b956cb2e723c0f2935496933/Dockerfile
-
+-->tap on new item -> fill name -> select pipeline
 
 
 ![tap on new item -> fill name -> select pipeline]({744CE577-6FA6-466F-98EA-10171385DABF}.png)
-
+-->select trigger -> poll scm(*****)(this checks your git repo for changes every 5 minutes)
 
 
 ![select trigger -> poll scm(*****)(this checks your git repo for changes every 5 minutes)]({2DE70797-74ED-4857-A8BA-DD5B23294707}.png)
@@ -93,12 +93,12 @@ manage jenkins-> plugins
 
 
 ![alt text]({18BF9D77-C065-4918-98CB-ED26F97C852B}.png)
-
+-->tap on save
 
 
 ![tap on save ]({1D2AA0D2-AC13-4047-B832-2115E76D6396}.png)
 
-
+-->build now
 
 ![build now]({432CD641-679B-4662-8229-F9B4E0FC2FAC}.png)
 
@@ -175,18 +175,14 @@ pipeline {
 ```
 
 This pipeline builds and tests the Docker image every time there is a new commit in the repository.
-'''
+-->dont forget to check logs
 
 
 ![dont forget to check logs]({FEE90B55-3CBA-421B-AB2F-047B0996CDCD}.png)
-
-
-'''
-
+-->started by SCM change(starts everytime after changes are made in repo)
 
 ![started by SCM change(starts everytime after changes are made in repo)]({D58C0E8D-C88B-42AB-BEF6-9AB7B21DED61}.png)
 
-'''
 ## 4. Kubernetes Deployment
 
 The Dockerized application is deployed to a Kubernetes cluster using Kubernetes manifests. The following files were created:
@@ -288,13 +284,8 @@ spec:
 ```bash
 kubectl apply -f argo-cd-application.yaml
 ```
-'''
-
 
 ![alt text]({8C93171F-121C-4F01-BC3C-D6EDC2A38D96}.png)
-
-
-'''
 
 ## 6. Canary Release Strategy with Argo Rollouts
 
@@ -370,12 +361,11 @@ scrape_configs:
 
 - Install Grafana on your Kubernetes cluster. username and password is admin
 - Set up Grafana dashboards to visualize application metrics from Prometheus.
-'''
+-->add data source -> prometheus -> http://192.ks.x.x:9090
 
 ![add data source -> prometheus -> http://192.ks.x.x:9090]({D2EB06F7-383D-4B4A-9335-B65BD61F3103}.png)
 
 
-'''
 
 Logging:
 Centralized logging is set up using EFK Stack (Elasticsearch, Fluentd, Kibana). This helps in collecting, analyzing, and visualizing logs from the Kubernetes pods.
