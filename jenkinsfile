@@ -1,5 +1,5 @@
 pipeline {
-    agent any // Run on any available agent
+    agent any
 
     triggers {
         pollSCM('* * * * *') // Adjust polling frequency as needed
@@ -9,48 +9,37 @@ pipeline {
         stage('Clone Repository') {
             steps {
                 echo "Cloning the repository..."
-                git branch: 'main', url: 'https://github.com/Bharat-Singhh/Portfolio.git' // Replace with your repository URL
+                git branch: 'main', url: 'https://github.com/Bharat-Singhh/Portfolio.git'
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build and Test') {
             steps {
                 echo "Building Docker image..."
                 script {
                     sh 'docker build -t india0/portfolio-site:latest .'
                 }
-            }
-        }
 
-        stage('Run and Test Application') {
-            steps {
+                echo "Starting the application container..."
                 script {
-                    echo "Starting the application container..."
+                    sh '''
+                    docker run -d --name portfolio-test-container -p 8088:80 india0/portfolio-site:latest
+                    '''
+                }
+
+                echo "Waiting for the application to start..."
+                sleep(30) // Increased wait time
+
+                echo "Testing the application..."
+                script {
                     try {
-                        // Run the container
                         sh '''
-                        docker run -d --name portfolio-test-container -p 8088:80 india0/portfolio-site:latest
-                        '''
+                        curl -f http://192.168.1.10:8088
 
-                        // Wait for the application to initialize
-                        echo "Waiting for the application to start..."
-                        sleep(15)
-
-                        // Test the application
-                        echo "Testing the application..."
-                        sh '''
-                        curl -f http://localhost:8088
                         echo "✅ Application test successful!"
                         '''
                     } catch (Exception e) {
                         error "❌ Application test failed! Check the logs for details."
-                    } finally {
-                        // Stop and remove the container after testing
-                        echo "Stopping and cleaning up the test container..."
-                        sh '''
-                        docker stop portfolio-test-container || true
-                        docker rm portfolio-test-container || true
-                        '''
                     }
                 }
             }
@@ -61,7 +50,8 @@ pipeline {
         always {
             echo "Cleaning up Docker resources..."
             sh '''
-            docker system prune -f --filter "until=24h"
+            docker stop portfolio-test-container || true
+            docker rm portfolio-test-container || true
             '''
             cleanWs()
         }
