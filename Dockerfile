@@ -1,4 +1,5 @@
-# Dockerfile
 FROM nginx:alpine
-COPY . /usr/share/nginx/html
-EXPOSE 80
+
+COPY . /usr/share/nginx/html/
+
+EXPOSE 8081
