@@ -29,7 +29,7 @@ pipeline {
                     try {
                         // Run the container
                         sh '''
-                        docker run -d --name portfolio-test-container -p 8080:80 india0/portfolio-site:latest
+                        docker run -d --name portfolio-test-container -p 8088:80 india0/portfolio-site:latest
                         '''
 
                         // Wait for the application to initialize
@@ -39,7 +39,7 @@ pipeline {
                         // Test the application
                         echo "Testing the application..."
                         sh '''
-                        curl -f http://localhost:8080
+                        curl -f http://localhost:8088
                         echo "✅ Application test successful!"
                         '''
                     } catch (Exception e) {
