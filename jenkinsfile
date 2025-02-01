@@ -28,7 +28,7 @@ pipeline {
                 }
 
                 echo "Waiting for the application to start..."
-                sleep(30) // Increased wait time
+                sleep(30) 
 
                 echo "Testing the application..."
                 script {
