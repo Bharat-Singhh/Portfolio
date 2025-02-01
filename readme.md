@@ -273,7 +273,7 @@ spec:
     name: ""
     namespace: default
   source:
-    repoURL: 'https://github.com/yourusername/portfolio-repo'
+    repoURL: 'https://github.com/Bharat-Singhh/Portfolio.git'
     targetRevision: HEAD
     path: k8s
   project: default
