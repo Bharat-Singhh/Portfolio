@@ -1,4 +1,4 @@
-# DevOps Engineer Internship Assignment
+# Cloud-Native App Deployment Pipeline
 
 This project demonstrates my proficiency in setting up a Continuous Integration and Deployment (CI/CD) pipeline, containerization, orchestration, and monitoring in a cloud environment. The application I worked on is my portfolio website, built using HTML, CSS, and JavaScript.
 
